@@ -46,7 +46,7 @@ HTML_TEMPLATE = """
             position: relative;
         }
         .terminal-container::before {
-            content: "SYS_VER: 8.0.0 // RENDER_SERVER";
+            content: "SYS_VER: 8.2.0 // RENDER_SERVER";
             position: absolute;
             top: -12px; right: 20px;
             background: var(--bg-dark);
@@ -116,37 +116,32 @@ def index():
         url = request.form.get('url', '').strip()
         if url:
             try:
-                output_template = os.path.join(DOWNLOAD_DIR, '%(id)s.%(ext)s')
-                
-                # جلب اسم الملف المتوقع
-                cmd_filename = ["yt-dlp", "--print", "filename", "-f", "bv*+ba/b", url]
-                target_filename = subprocess.check_output(cmd_filename, text=True).strip()
-                
-                if target_filename:
-                    base_id = os.path.splitext(os.path.basename(target_filename))[0]
-                    final_filename = f"{base_id}.mp4"
-                    final_path = os.path.join(DOWNLOAD_DIR, final_filename)
-                    
-                    # أمر التحميل والدمج بأعلى جودة
-                    download_command = [
-                        "yt-dlp",
-                        "-f", "bv*+ba/b",
-                        "--merge-output-format", "mp4",
-                        "-o", output_template,
-                        url
-                    ]
-                    
-                    subprocess.run(download_command, check=True)
-                    
-                    if os.path.exists(final_path):
-                        filename = final_filename
-                        message = "[ تم اكتمال الدمج والسحب بنجاح: أعلى جودة متاحة ]"
-                    else:
-                        error = True
-                        message = "[ خطأ: فشل حفظ الملف الناتج على السيرفر ]"
+                # تنظيف الرابط من معاملات التتبع الإضافية مثل ?si=
+                if '&' in url:
+                    url = url.split('&')[0]
+
+                # استخدام اسم ثابت وموحد مؤقت يعتمد على معرف عشوائي أو جلب المعرف مباشرة
+                output_template = os.path.join(DOWNLOAD_DIR, 'downloaded_video.mp4')
+                final_path = output_template
+
+                # أمر التحميل والدمج المباشر بأعلى جودة بصيغة mp4
+                download_command = [
+                    "yt-dlp",
+                    "-f", "bv*+ba/b",
+                    "--merge-output-format", "mp4",
+                    "-o", final_path,
+                    "--force-overwrites",
+                    url
+                ]
+
+                result = subprocess.run(download_command, capture_output=True, text=True)
+
+                if result.returncode == 0 and os.path.exists(final_path):
+                    filename = 'downloaded_video.mp4'
+                    message = "[ تم اكتمال الدمج والسحب بنجاح: أعلى جودة متاحة ]"
                 else:
                     error = True
-                    message = "[ خطأ: تعذر قراءة بيانات الفيديو ]"
+                    message = f"[ خطأ في المعالجة: {result.stderr[-200:] if result.stderr else 'فشل التحميل'} ]"
             except Exception as e:
                 error = True
                 message = f"[ خطأ تقني: {str(e)} ]"
